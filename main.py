@@ -10,15 +10,27 @@ from data.settings import NUMBER_OF_ATTEMPTS, ASYNC_TASK_IN_SAME_TIME
 results = []
 
 async def save_result(address, amount_start, amount_end, error=None):
+    if amount_start is not None and amount_end is not None:
+        amount_range = f"{amount_start} - {amount_end}"
+        if not amount_start and not amount_end:
+            status = "❌ Success: Not Eligible"
+        else:
+            status = "✅ Success: Eligible"
+    else:
+        amount_range = "0 - 0" if error == "Not Eligible" else "N/A"
+        status = f"❌ Error: {error}"
+
     result = {
         "Address": address,
-        "Amount Range": f"{amount_start} - {amount_end}" if amount_start and amount_end else "N/A",
-        "Status": "✅ Success" if amount_start and amount_end else f"❌ Error: {error}"
+        "Amount Range": amount_range,
+        "Status": status
     }
     results.append(result)
+
     async with tasks_lock:
         with open(RESULT, "a", encoding="utf-8") as f:
             f.write(f"{result['Address']} | {result['Amount Range']} | {result['Status']}\n")
+
 
 async def parse_info(semaphore, address, proxy):
     async with semaphore:
@@ -46,9 +58,14 @@ async def parse_info(semaphore, address, proxy):
                         amount_range = data.get("tokenAmountRange", {})
                         amount_start = float(amount_range.get("amountStart", "0"))
                         amount_end = float(amount_range.get("amountEnd", "0"))
-                        await save_result(address, amount_start, amount_end)
+                        
+                        if not eligibility:
+                            await save_result(address, 0, 0, "Not Eligible")
+                        else:
+                            await save_result(address, amount_start, amount_end)
+
                         logger.info(f'{address} | Eligibility: {eligibility} | Amount Range: {amount_start} - {amount_end}')
-                        return  # Завершаем выполнение при успешном ответе
+                        return  
                     else:
                         logger.error(f'{address} | Код ответа: {response.status_code} | Текст: {response.text}')
             except Exception as e:
@@ -68,7 +85,7 @@ async def main():
         logger.error(f'Кол-во прокси меньше, чем адресов. Прокси: {len(proxies)} | Адресов: {len(evm_addresses)}')
         return
     
-    semaphore = asyncio.Semaphore(NUMBER_OF_ATTEMPTS)
+    semaphore = asyncio.Semaphore(ASYNC_TASK_IN_SAME_TIME)
     tasks = [asyncio.create_task(parse_info(semaphore, address, proxies[num])) for num, address in enumerate(evm_addresses)]
     await asyncio.gather(*tasks)
     
