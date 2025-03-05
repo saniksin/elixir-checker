@@ -90,17 +90,30 @@ async def main():
     await asyncio.gather(*tasks)
     
     df = pd.DataFrame(results)
-    successful_entries = df[df["Status"] == "✅ Success"]
+    successful_entries = df[df["Status"].str.startswith("✅ Success")]
+
     if not successful_entries.empty:
         min_total = successful_entries["Amount Range"].apply(lambda x: float(x.split(" - ")[0]) if " - " in x else 0).sum()
         max_total = successful_entries["Amount Range"].apply(lambda x: float(x.split(" - ")[1]) if " - " in x else 0).sum()
     else:
         min_total, max_total = 0, 0
-    
+
     logger.info("\n✅ Все задачи завершены! Результаты записаны в файл.")
     logger.info("\nРезультаты:")
     logger.info("\n" + tabulate(df, headers="keys", tablefmt="grid"))
     logger.info(f"\nОбщая сумма ELX (Range): {min_total:.8f} - {max_total:.8f}")
+
+    # Подсчет статистики по кошелькам
+    total_wallets = len(df)
+    eligible_wallets = df[df["Status"] == "✅ Success: Eligible"].shape[0]
+    not_eligible_wallets = df[df["Status"] == "❌ Success: Not Eligible"].shape[0]
+    failed_wallets = df[df["Status"].str.startswith("❌ Error")].shape[0]
+
+    logger.info("\n📊 Статистика по кошелькам:")
+    logger.info(f"Всего кошельков: {total_wallets}")
+    logger.info(f"✅ Eligible: {eligible_wallets}")
+    logger.info(f"❌ Not Eligible: {not_eligible_wallets}")
+    logger.info(f"⚠️ Не спарсилось: {failed_wallets}")
 
 
 if __name__ == "__main__":
