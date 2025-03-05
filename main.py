@@ -50,7 +50,7 @@ async def parse_info(semaphore, address, proxy):
                         logger.info(f'{address} | Eligibility: {eligibility} | Amount Range: {amount_start} - {amount_end}')
                         return  # Завершаем выполнение при успешном ответе
                     else:
-                        logger.error(f'{address} | Код ответа: {response.status} | Текст: {response.text()}')
+                        logger.error(f'{address} | Код ответа: {response.status_code} | Текст: {response.text}')
             except Exception as e:
                 logger.error(f'{address} | Ошибка: {e}')
         
